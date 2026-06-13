@@ -221,6 +221,18 @@ test("html responses stay uncacheable", async () => {
   });
 });
 
+test("frontend exposes list and icon views without selection checkboxes", async () => {
+  await withServer(async (baseUrl) => {
+    const res = await fetch(baseUrl);
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /id="listViewButton"/);
+    assert.match(html, /id="iconViewButton"/);
+    assert.doesNotMatch(html, /id="selectAll"/);
+    assert.doesNotMatch(html, /type="checkbox"/);
+  });
+});
+
 test("raw upload writes a file to the selected real root", async () => {
   await fs.mkdir(path.join(userRoot, "share"), { recursive: true });
   await fs.mkdir(path.join(disk1, "share"), { recursive: true });

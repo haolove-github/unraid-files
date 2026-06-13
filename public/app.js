@@ -8,6 +8,7 @@ const state = {
   displayMode: "list",
   selected: new Set(),
   focused: null,
+  selectionAnchor: null,
   disks: [],
   dockerMounts: [],
   favorites: [],
@@ -59,7 +60,8 @@ const els = {
   searchClear: $("searchClear"),
   directoryNavUp: $("directoryNavUp"),
   directoryBreadcrumbs: $("directoryBreadcrumbs"),
-  selectAll: $("selectAll"),
+  listViewButton: $("listViewButton"),
+  iconViewButton: $("iconViewButton"),
   fileTable: $("fileTable"),
   fileRows: $("fileRows"),
   fileGrid: $("fileGrid"),
@@ -381,6 +383,10 @@ function renderDisplayMode() {
   els.fileTable.hidden = isCards;
   els.fileGrid.hidden = !isCards;
   els.tableWrap.classList.toggle("cards-mode", isCards);
+  els.listViewButton.classList.toggle("active", !isCards);
+  els.iconViewButton.classList.toggle("active", isCards);
+  els.listViewButton.setAttribute("aria-pressed", String(!isCards));
+  els.iconViewButton.setAttribute("aria-pressed", String(isCards));
 }
 
 function renderSortButtons() {
@@ -393,19 +399,8 @@ function renderSortButtons() {
   });
 }
 
-function setFocused(entry) {
-  state.focused = entry || null;
-  renderRows();
-  renderDetails();
-  updateSelection();
-}
-
 function updateSelection() {
-  const count = state.selected.size;
-  const inTrash = state.view === "trash";
-  const rowCount = inTrash ? state.trashEntries.length : state.entries.length;
-  els.selectAll.checked = rowCount > 0 && count === rowCount;
-  els.selectAll.indeterminate = count > 0 && count < rowCount;
+  return state.selected.size;
 }
 
 function renderDirectoryNavigation() {
@@ -460,29 +455,46 @@ function clearDisplayContainers() {
   els.fileGrid.innerHTML = "";
 }
 
-function updateEntrySelection(key, checked, entry) {
-  if (checked) state.selected.add(key);
-  else state.selected.delete(key);
-  if (checked) state.focused = entry;
-  renderRows();
-  renderDetails();
-  updateSelection();
+function entryKey(entry) {
+  return state.view === "trash" ? entry.id : entry.path;
 }
 
-function focusTrashEntry(entry) {
-  state.selected.clear();
-  state.selected.add(entry.id);
-  state.focused = entry;
-  renderRows();
-  renderDetails();
-  updateSelection();
+function visibleEntries() {
+  return state.view === "trash" ? state.trashEntries : sortedEntries();
 }
 
-function focusSingleEntry(key, entry) {
-  state.selected.clear();
-  state.selected.add(key);
-  state.focused = entry;
-  renderRows();
+function renderSelectionState() {
+  document.querySelectorAll(".file-row[data-entry-key], .file-card[data-entry-key]").forEach((element) => {
+    element.classList.toggle("active", state.selected.has(element.dataset.entryKey));
+  });
+}
+
+function selectEntry(event, entry) {
+  const key = entryKey(entry);
+  const additive = event.ctrlKey || event.metaKey;
+  if (event.shiftKey && state.selectionAnchor) {
+    const entries = visibleEntries();
+    const start = entries.findIndex((item) => entryKey(item) === state.selectionAnchor);
+    const end = entries.findIndex((item) => entryKey(item) === key);
+    if (start >= 0 && end >= 0) {
+      if (!additive) state.selected.clear();
+      for (const item of entries.slice(Math.min(start, end), Math.max(start, end) + 1)) {
+        state.selected.add(entryKey(item));
+      }
+    }
+  } else if (additive) {
+    if (state.selected.has(key)) state.selected.delete(key);
+    else state.selected.add(key);
+    state.selectionAnchor = key;
+  } else {
+    state.selected.clear();
+    state.selected.add(key);
+    state.selectionAnchor = key;
+  }
+  state.focused = state.selected.has(key)
+    ? entry
+    : visibleEntries().find((item) => state.selected.has(entryKey(item))) || null;
+  renderSelectionState();
   renderDetails();
   updateSelection();
 }
@@ -491,20 +503,12 @@ function focusEntryForContext(key, entry) {
   if (!state.selected.has(key)) {
     state.selected.clear();
     state.selected.add(key);
+    state.selectionAnchor = key;
   }
   state.focused = entry;
-  renderRows();
+  renderSelectionState();
   renderDetails();
   updateSelection();
-}
-
-function cardMeta(label, value) {
-  return `
-    <div class="card-meta-item">
-      <span class="card-meta-label">${escapeHtml(label)}</span>
-      <span class="card-meta-value">${value}</span>
-    </div>
-  `;
 }
 
 function setAllSelection(checked) {
@@ -513,7 +517,8 @@ function setAllSelection(checked) {
     const rows = state.view === "trash" ? state.trashEntries : state.entries;
     for (const entry of rows) state.selected.add(state.view === "trash" ? entry.id : entry.path);
   }
-  renderRows();
+  state.selectionAnchor = null;
+  renderSelectionState();
   renderDetails();
   updateSelection();
 }
@@ -524,8 +529,8 @@ function renderTrashCards() {
 
   for (const entry of state.trashEntries) {
     const card = document.createElement("article");
-    card.className = `file-card trash-card${state.focused?.id === entry.id ? " active" : ""}`;
-    const checked = state.selected.has(entry.id) ? "checked" : "";
+    card.className = `file-card trash-card${state.selected.has(entry.id) ? " active" : ""}`;
+    card.dataset.entryKey = entry.id;
     const iconClass =
       entry.type === "directory" ? "dir" :
       entry.type === "symlink" ? "link" :
@@ -533,41 +538,17 @@ function renderTrashCards() {
     const name = entry.name || entry.originalLogical.split("/").pop() || entry.originalLogical;
 
     card.innerHTML = `
-      <div class="card-head">
-        <label class="card-check">
-          <input type="checkbox" ${checked} aria-label="选择 ${escapeHtml(name)}" />
-        </label>
-        <span class="pill">${escapeHtml(entry.disk || "logical")}</span>
-      </div>
-      <div class="card-body">
-        <div class="name-cell">
-          <span class="file-icon ${iconClass}">${escapeHtml(iconFor(entry))}</span>
-          <div class="card-name-wrap">
-            <strong class="card-name" title="${escapeHtml(name)}">${escapeHtml(name)}</strong>
-            <span class="card-subtitle" title="${escapeHtml(entry.originalLogical)}">${escapeHtml(entry.originalLogical)}</span>
-          </div>
-        </div>
-        <div class="card-meta-grid">
-          ${cardMeta("删除时间", escapeHtml(formatDate(Date.parse(entry.deletedAt) || entry.mtime)))}
-          ${cardMeta("大小", escapeHtml(entry.type === "directory" ? "文件夹" : formatBytes(entry.size)))}
-          ${cardMeta("状态", `<span class="muted">${escapeHtml(entry.manifest ? "可恢复" : "旧项目")}</span>`)}
-        </div>
-      </div>
+      <span class="file-icon ${iconClass}">${escapeHtml(iconFor(entry))}</span>
+      <strong class="card-name" title="${escapeHtml(name)}">${escapeHtml(name)}</strong>
+      <span class="card-subtitle">${escapeHtml(entry.disk || "logical")}</span>
     `;
 
-    card.onclick = (event) => {
-      if (event.target.closest("input")) return;
-      focusTrashEntry(entry);
-    };
+    card.onclick = (event) => selectEntry(event, entry);
     card.oncontextmenu = (event) => {
       event.preventDefault();
       focusEntryForContext(entry.id, entry);
       showContextMenu(event.clientX, event.clientY, "trash");
     };
-    card.querySelector("input").onchange = (event) => {
-      updateEntrySelection(entry.id, event.target.checked, entry);
-    };
-
     els.fileGrid.append(card);
   }
 }
@@ -584,25 +565,21 @@ function renderTrashRows() {
 
   for (const entry of state.trashEntries) {
     const tr = document.createElement("tr");
-    tr.className = `file-row${state.focused?.id === entry.id ? " active" : ""}`;
-    tr.onclick = (event) => {
-      if (event.target.closest("input")) return;
-      focusTrashEntry(entry);
-    };
+    tr.className = `file-row${state.selected.has(entry.id) ? " active" : ""}`;
+    tr.dataset.entryKey = entry.id;
+    tr.onclick = (event) => selectEntry(event, entry);
     tr.oncontextmenu = (event) => {
       event.preventDefault();
       focusEntryForContext(entry.id, entry);
       showContextMenu(event.clientX, event.clientY, "trash");
     };
 
-    const checked = state.selected.has(entry.id) ? "checked" : "";
     const iconClass =
       entry.type === "directory" ? "dir" :
       entry.type === "symlink" ? "link" :
       "file";
     const name = entry.name || entry.originalLogical.split("/").pop() || entry.originalLogical;
     tr.innerHTML = `
-      <td class="check-cell"><input type="checkbox" ${checked} aria-label="选择 ${escapeHtml(name)}" /></td>
       <td>
         <div class="name-cell">
           <span class="file-icon ${iconClass}">${escapeHtml(iconFor(entry))}</span>
@@ -618,10 +595,6 @@ function renderTrashRows() {
       <td><span class="muted" title="${escapeHtml(entry.trashPath)}">${escapeHtml(entry.manifest ? "可恢复" : "旧项目")}</span></td>
     `;
 
-    tr.querySelector("input").onchange = (event) => {
-      updateEntrySelection(entry.id, event.target.checked, entry);
-    };
-
     els.fileRows.append(tr);
   }
 }
@@ -632,49 +605,21 @@ function renderFileCards() {
 
   for (const entry of sortedEntries()) {
     const card = document.createElement("article");
-    card.className = `file-card${state.focused?.path === entry.path ? " active" : ""}`;
-    const checked = state.selected.has(entry.path) ? "checked" : "";
+    card.className = `file-card${state.selected.has(entry.path) ? " active" : ""}`;
+    card.dataset.entryKey = entry.path;
     const iconClass =
       entry.type === "directory" ? "dir" :
       entry.type === "symlink" ? "link" :
       "file";
     const diskClass = entry.locations?.length > 1 ? "pill split" : "pill";
-    const nameControl =
-      entry.type === "directory"
-        ? `<button class="link-name card-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</button>`
-        : `<strong class="card-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</strong>`;
-    const dockerTags = entry.dockerMounts?.length
-      ? entry.dockerMounts.map((mount) => `<span class="pill docker">${escapeHtml(mount.container)}</span>`).join("")
-      : `<span class="muted">无 Docker 挂载</span>`;
 
     card.innerHTML = `
-      <div class="card-head">
-        <label class="card-check">
-          <input type="checkbox" ${checked} aria-label="选择 ${escapeHtml(entry.name)}" />
-        </label>
-        <span class="${diskClass}">${escapeHtml(entry.disk || "logical")}</span>
-      </div>
-      <div class="card-body">
-        <div class="name-cell">
-          <span class="file-icon ${iconClass}">${escapeHtml(iconFor(entry))}</span>
-          <div class="card-name-wrap">
-            ${nameControl}
-            <span class="card-subtitle" title="${escapeHtml(entry.path)}">${escapeHtml(entry.path)}</span>
-          </div>
-        </div>
-        <div class="card-meta-grid">
-          ${cardMeta("大小", escapeHtml(entry.type === "directory" ? "文件夹" : formatBytes(entry.size)))}
-          ${cardMeta("修改", escapeHtml(formatDate(entry.mtime)))}
-          ${cardMeta("类型", escapeHtml(entry.type))}
-        </div>
-        <div class="card-tags">${dockerTags}</div>
-      </div>
+      <span class="file-icon ${iconClass}">${escapeHtml(iconFor(entry))}</span>
+      <strong class="card-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</strong>
+      <span class="${diskClass}">${escapeHtml(entry.disk || "logical")}</span>
     `;
 
-    card.onclick = (event) => {
-      if (event.target.closest("input") || event.target.closest(".link-name")) return;
-      focusSingleEntry(entry.path, entry);
-    };
+    card.onclick = (event) => selectEntry(event, entry);
     card.ondblclick = () => {
       if (entry.type === "directory") loadPath(entry.path);
     };
@@ -683,18 +628,6 @@ function renderFileCards() {
       focusEntryForContext(entry.path, entry);
       showContextMenu(event.clientX, event.clientY, "entry");
     };
-    card.querySelector("input").onchange = (event) => {
-      updateEntrySelection(entry.path, event.target.checked, entry);
-    };
-
-    const openButton = card.querySelector(".link-name");
-    if (openButton) {
-      openButton.onclick = (event) => {
-        event.stopPropagation();
-        loadPath(entry.path);
-      };
-    }
-
     els.fileGrid.append(card);
   }
 }
@@ -717,22 +650,16 @@ function renderRows() {
 
   for (const entry of sortedEntries()) {
     const tr = document.createElement("tr");
-    tr.className = `file-row${state.focused?.path === entry.path ? " active" : ""}`;
-    tr.onclick = (event) => {
-      if (event.target.closest("input")) return;
-      focusSingleEntry(entry.path, entry);
-    };
+    tr.className = `file-row${state.selected.has(entry.path) ? " active" : ""}`;
+    tr.dataset.entryKey = entry.path;
+    tr.onclick = (event) => selectEntry(event, entry);
     tr.oncontextmenu = (event) => {
       event.preventDefault();
       focusEntryForContext(entry.path, entry);
       showContextMenu(event.clientX, event.clientY, "entry");
     };
 
-    const checked = state.selected.has(entry.path) ? "checked" : "";
-    const nameControl =
-      entry.type === "directory"
-        ? `<button class="link-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</button>`
-        : `<span class="file-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>`;
+    const nameControl = `<span class="file-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>`;
     const iconClass =
       entry.type === "directory" ? "dir" :
       entry.type === "symlink" ? "link" :
@@ -743,8 +670,7 @@ function renderRows() {
       : `<span class="muted">-</span>`;
 
     tr.innerHTML = `
-      <td class="check-cell"><input type="checkbox" ${checked} aria-label="选择 ${escapeHtml(entry.name)}" /></td>
-          <td>
+      <td>
         <div class="name-cell">
           <span class="file-icon ${iconClass}">${escapeHtml(iconFor(entry))}</span>
           ${nameControl}
@@ -756,12 +682,6 @@ function renderRows() {
       <td>${docker}</td>
     `;
 
-    tr.querySelector("input").onchange = (event) => {
-      updateEntrySelection(entry.path, event.target.checked, entry);
-    };
-
-    const openButton = tr.querySelector(".link-name");
-    if (openButton) openButton.onclick = () => loadPath(entry.path);
     tr.ondblclick = () => {
       if (entry.type === "directory") loadPath(entry.path);
     };
@@ -1159,6 +1079,7 @@ async function loadPath(path) {
     state.parent = data.parent;
     state.entries = data.entries;
     state.selected.clear();
+    state.selectionAnchor = null;
     state.focused = data.current;
     els.homeSource.classList.add("active");
     els.trashSource.classList.remove("active");
@@ -1185,6 +1106,7 @@ async function loadTrash() {
     state.view = "trash";
     state.trashEntries = data.entries;
     state.selected.clear();
+    state.selectionAnchor = null;
     state.focused = data.entries[0] || null;
     els.homeSource.classList.remove("active");
     els.trashSource.classList.add("active");
@@ -1227,6 +1149,7 @@ async function loadSearch(loadMore = false) {
     state.view = "files";
     state.entries = loadMore ? state.entries.concat(data.results || []) : (data.results || []);
     state.selected.clear();
+    state.selectionAnchor = null;
     state.focused = loadMore ? state.focused : null;
     state.search = {
       active: true,
@@ -1532,6 +1455,8 @@ document.querySelectorAll(".sort-button").forEach((button) => {
     renderRows();
   };
 });
+els.listViewButton.onclick = () => setDisplayMode("list");
+els.iconViewButton.onclick = () => setDisplayMode("cards");
 async function createFolderAction() {
   await runAction(async () => {
     const name = await promptValue("新建文件夹", "文件夹名称");
@@ -1733,10 +1658,21 @@ els.tableWrap.oncontextmenu = (event) => {
   event.preventDefault();
   state.selected.clear();
   state.focused = null;
-  renderRows();
+  state.selectionAnchor = null;
+  renderSelectionState();
   renderDetails();
   updateSelection();
   showContextMenu(event.clientX, event.clientY, "blank");
+};
+
+els.tableWrap.onclick = (event) => {
+  if (event.target.closest(".file-row, .file-card, button, input, thead")) return;
+  state.selected.clear();
+  state.focused = null;
+  state.selectionAnchor = null;
+  renderSelectionState();
+  renderDetails();
+  updateSelection();
 };
 
 els.contextMenu.onclick = (event) => {
@@ -1767,6 +1703,14 @@ document.addEventListener("keydown", (event) => {
     els.searchInput.select();
   }
   if (
+    (event.ctrlKey || event.metaKey) &&
+    event.key.toLowerCase() === "a" &&
+    !event.target.closest("input, textarea, select, button, [contenteditable='true']")
+  ) {
+    event.preventDefault();
+    setAllSelection(true);
+  }
+  if (
     event.key === "F2" &&
     state.view === "files" &&
     state.selected.size === 1 &&
@@ -1791,10 +1735,6 @@ window.addEventListener("resize", () => {
   hideContextMenu();
   syncResponsiveLayout();
 });
-
-els.selectAll.onchange = () => {
-  setAllSelection(els.selectAll.checked);
-};
 
 els.searchButton.onclick = () =>
   runAction(async () => {

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Unraid Files</title>
-    <link rel="stylesheet" href="/styles.css?v=20260613-18" />
+    <link rel="stylesheet" href="/styles.css?v=20260613-19" />
   </head>
   <body>
     <main class="shell">
@@ -97,6 +97,10 @@
         <nav class="directory-nav" aria-label="目录导航">
           <button class="directory-up" id="directoryNavUp" type="button">上一级</button>
           <div class="directory-breadcrumbs" id="directoryBreadcrumbs"></div>
+          <div class="view-switch" aria-label="视图方式">
+            <button id="listViewButton" type="button" data-view-mode="list" title="列表视图">列表</button>
+            <button id="iconViewButton" type="button" data-view-mode="cards" title="图标视图">图标</button>
+          </div>
         </nav>
 
         <section class="content">
@@ -108,7 +112,6 @@
             <table class="file-table" id="fileTable">
               <thead>
                 <tr>
-                  <th class="check-cell"><input id="selectAll" type="checkbox" /></th>
                   <th><button class="sort-button active asc" data-sort="name" type="button">名称</button></th>
                   <th><button class="sort-button" data-sort="size" type="button">大小</button></th>
                   <th><button class="sort-button" data-sort="mtime" type="button">修改时间</button></th>
@@ -169,6 +172,6 @@
     <div id="toastStack" class="toast-stack" aria-live="polite"></div>
     <input id="uploadInput" type="file" multiple hidden />
 
-    <script src="/app.js?v=20260613-14"></script>
+    <script src="/app.js?v=20260613-15"></script>
   </body>
 </html>

@@ -1,6 +1,6 @@
 {
   "name": "unraid-files",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A fast Unraid-aware file manager that scans /mnt/user and moves real files on disk roots.",
   "repository": {
     "type": "git",
