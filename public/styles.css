@@ -1306,6 +1306,10 @@ button.danger {
   overflow: visible;
 }
 
+.details.cards-mode {
+  padding-top: 18px;
+}
+
 .details-head {
   position: sticky;
   top: 0;
@@ -1324,6 +1328,10 @@ button.danger {
   background: rgba(248, 250, 252, 0.92);
   box-shadow: inset 0 -1px 0 var(--line);
   backdrop-filter: blur(14px);
+}
+
+.details-head[hidden] {
+  display: none;
 }
 
 .detail-body {

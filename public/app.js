@@ -70,6 +70,7 @@ const els = {
   viewLoadingText: $("viewLoadingText"),
   content: document.querySelector(".content"),
   tableWrap: document.querySelector(".table-wrap"),
+  detailsHead: $("detailsHead"),
   details: $("details"),
   detailBody: $("detailBody"),
   diskList: $("diskList"),
@@ -395,6 +396,8 @@ function renderDisplayMode() {
   els.fileTable.hidden = isCards;
   els.fileGrid.hidden = !isCards;
   els.tableWrap.classList.toggle("cards-mode", isCards);
+  els.detailsHead.hidden = isCards;
+  els.details.classList.toggle("cards-mode", isCards);
   els.listViewButton.classList.toggle("active", !isCards);
   els.iconViewButton.classList.toggle("active", isCards);
   els.listViewButton.setAttribute("aria-pressed", String(!isCards));
