@@ -21,6 +21,7 @@ const {
   executeDeletePlan,
   cleanupJobs,
   cleanupTrashRefs,
+  formatDiskLocations,
   jobs,
   parseBoundedInt,
   searchEntries,
@@ -150,6 +151,19 @@ test("parseBoundedInt rejects invalid values", () => {
   assert.equal(parseBoundedInt(undefined, 8, 0, 20, "depth"), 8);
   assert.throws(() => parseBoundedInt("abc", 8, 0, 20, "depth"), /depth must be an integer/);
   assert.throws(() => parseBoundedInt("21", 8, 0, 20, "depth"), /depth must be an integer/);
+});
+
+test("formatDiskLocations lists unique disks in location order", () => {
+  assert.equal(
+    formatDiskLocations([
+      { disk: "disk1" },
+      { disk: "disk2" },
+      { disk: "disk1" },
+      { disk: "cache" },
+    ]),
+    "disk1, disk2, cache"
+  );
+  assert.equal(formatDiskLocations([]), "");
 });
 
 test("searchEntries paginates in stable breadth-first natural order", async () => {

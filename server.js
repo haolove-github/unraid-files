@@ -309,6 +309,10 @@ function statType(st) {
   return "other";
 }
 
+function formatDiskLocations(locations) {
+  return [...new Set((locations || []).map((location) => location.disk).filter(Boolean))].join(", ");
+}
+
 function isTextPreviewName(filePath) {
   const base = path.basename(filePath).toLowerCase();
   const ext = path.extname(base).slice(1);
@@ -422,7 +426,7 @@ async function makeEntry(logicalPath, dirent, dockerMounts) {
     uid: st ? st.uid : null,
     gid: st ? st.gid : null,
     extension: path.extname(name).slice(1).toLowerCase(),
-    disk: locations.length === 1 ? locations[0].disk : locations.length > 1 ? "split" : "",
+    disk: formatDiskLocations(locations),
     locations,
     dockerMounts: mounts,
   };
@@ -1609,6 +1613,7 @@ module.exports = {
   cleanupTrashRefs,
   jobs,
   parseBoundedInt,
+  formatDiskLocations,
   searchEntries,
   runJob,
 };

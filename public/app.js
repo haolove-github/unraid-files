@@ -638,7 +638,7 @@ function renderFileCards() {
       entry.type === "directory" ? "dir" :
       entry.type === "symlink" ? "link" :
       "file";
-    const diskClass = entry.disk === "split" ? "pill split" : "pill";
+    const diskClass = entry.locations?.length > 1 ? "pill split" : "pill";
     const nameControl =
       entry.type === "directory"
         ? `<button class="link-name card-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</button>`
@@ -737,7 +737,7 @@ function renderRows() {
       entry.type === "directory" ? "dir" :
       entry.type === "symlink" ? "link" :
       "file";
-    const diskClass = entry.disk === "split" ? "pill split" : "pill";
+    const diskClass = entry.locations?.length > 1 ? "pill split" : "pill";
     const docker = entry.dockerMounts?.length
       ? `<span class="pill docker">${escapeHtml(entry.dockerMounts.map((m) => m.container).join(", "))}</span>`
       : `<span class="muted">-</span>`;
