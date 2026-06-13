@@ -87,6 +87,7 @@ const els = {
   directoryChoose: $("directoryChoose"),
   contextMenu: $("contextMenu"),
   toastStack: $("toastStack"),
+  uploadInput: $("uploadInput"),
 };
 
 function api(path, options = {}) {
@@ -124,6 +125,10 @@ function formatBytes(value) {
 function formatDate(value) {
   if (!value) return "-";
   return new Date(value).toLocaleString();
+}
+
+function formatMode(value) {
+  return Number.isInteger(value) ? value.toString(8).padStart(4, "0") : "-";
 }
 
 function escapeHtml(value) {
@@ -865,6 +870,7 @@ function renderDetails() {
   }
   if (entry.type === "file") {
     actions.push(`<button class="tool-button" id="detailDownload" type="button">下载文件</button>`);
+    actions.push(`<button class="tool-button" id="detailChecksum" type="button">计算 SHA-256</button>`);
   }
   const actionBlock = actions.length
     ? block("快捷操作", `<div class="detail-actions">${actions.join("")}</div>`)
@@ -878,6 +884,9 @@ function renderDetails() {
         ["逻辑路径", escapeHtml(entry.path)],
         ["类型", escapeHtml(entry.type)],
         ["所在磁盘", escapeHtml(entry.disk || "-")],
+        ["权限", escapeHtml(formatMode(entry.mode))],
+        ["所有者 UID", escapeHtml(entry.uid ?? "-")],
+        ["所有者 GID", escapeHtml(entry.gid ?? "-")],
         ["修改时间", escapeHtml(formatDate(entry.mtime))],
       ])
     ) + actionBlock + preview + locations + mounts;
@@ -892,6 +901,16 @@ function renderDetails() {
   if (openButton) openButton.onclick = () => loadPath(entry.path);
   const downloadButton = document.getElementById("detailDownload");
   if (downloadButton) downloadButton.onclick = downloadAction;
+  const checksumButton = document.getElementById("detailChecksum");
+  if (checksumButton) {
+    checksumButton.onclick = () => {
+      runAction(async () => {
+        const data = await api(`/api/checksum?path=${encodeURIComponent(entry.path)}`);
+        await copyText(data.checksum, "SHA-256 已复制");
+        return true;
+      }, { pending: "正在计算 SHA-256..." });
+    };
+  }
 
   if (!isImagePreviewable(entry) && isPreviewable(entry)) loadPreview(entry);
 }
@@ -954,7 +973,7 @@ function menuButton(label, action, disabled = false) {
 function showContextMenu(x, y, mode) {
   const selected = activeEntries();
   const single = selected.length === 1 ? selected[0] : null;
-  const canDownload = single?.type === "file";
+  const canDownload = selected.length > 0;
   const items = mode === "trash"
     ? [
         menuButton("恢复", "restore", !selected.length),
@@ -965,6 +984,7 @@ function showContextMenu(x, y, mode) {
         menuButton("返回上一级", "up", !state.parent),
         menuButton(state.favorites.includes(state.path) ? "取消收藏当前目录" : "收藏当前目录", "favorite"),
         menuButton("新建文件夹", "mkdir"),
+        menuButton("上传文件", "upload"),
         `<hr />`,
         menuButton("全选", "selectAll", !state.entries.length),
         menuButton(state.displayMode === "cards" ? "切换到列表视图" : "切换到卡片视图", "toggleView"),
@@ -975,7 +995,7 @@ function showContextMenu(x, y, mode) {
         menuButton("重命名", "rename", selected.length !== 1),
         menuButton("移动", "move", !selected.length),
         menuButton("复制", "copy", !selected.length),
-        menuButton("下载", "download", !canDownload),
+        menuButton(selected.length === 1 && single?.type === "file" ? "下载" : "打包下载", "download", !canDownload),
         `<hr />`,
         menuButton("移入回收区", "trash", !selected.length),
         menuButton("永久删除", "delete", !selected.length),
@@ -1015,6 +1035,9 @@ function dispatchContextAction(action) {
       break;
     case "mkdir":
       createFolderAction();
+      break;
+    case "upload":
+      uploadAction();
       break;
     case "refresh":
       hideContextMenu();
@@ -1645,11 +1668,58 @@ async function purgeAction() {
 }
 
 function downloadAction() {
-  const entry = activeEntries()[0];
-  if (!entry || entry.type !== "file") return;
+  const entries = activeEntries();
+  if (!entries.length) return;
   hideContextMenu();
-  window.location.href = `/api/download?path=${encodeURIComponent(entry.path)}`;
+  if (entries.length === 1 && entries[0].type === "file") {
+    window.location.href = `/api/download?path=${encodeURIComponent(entries[0].path)}`;
+    return;
+  }
+  const params = new URLSearchParams();
+  for (const entry of entries) params.append("path", entry.path);
+  params.set("name", `${state.path.split("/").pop() || "unraid-files"}.tar`);
+  window.location.href = `/api/archive?${params.toString()}`;
 }
+
+function uploadAction() {
+  hideContextMenu();
+  if (state.view !== "files") return;
+  els.uploadInput.value = "";
+  els.uploadInput.click();
+}
+
+async function uploadFile(file, overwrite = false) {
+  const response = await fetch(`/api/upload?parent=${encodeURIComponent(state.path)}&overwrite=${overwrite}`, {
+    method: "POST",
+    headers: { "x-file-name": encodeURIComponent(file.name) },
+    body: file,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload.error || `HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+els.uploadInput.onchange = () => {
+  const files = [...els.uploadInput.files];
+  if (!files.length) return;
+  runAction(async () => {
+    for (const file of files) {
+      try {
+        await uploadFile(file);
+      } catch (err) {
+        if (err.status !== 409 || !confirm(`${file.name} 已存在，是否覆盖？`)) throw err;
+        await uploadFile(file, true);
+      }
+    }
+    await loadPath(state.path);
+    await loadDisks();
+    return true;
+  }, { pending: `正在上传 ${files.length} 个文件...`, success: "上传完成" });
+};
 
 function openAction() {
   const entry = activeEntries()[0];

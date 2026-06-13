@@ -4,6 +4,7 @@ const http = require("http");
 const path = require("path");
 const url = require("url");
 const crypto = require("crypto");
+const { spawn } = require("child_process");
 
 const PORT = Number(process.env.PORT || 8080);
 const USER_ROOT = path.resolve(process.env.UNRAID_USER_ROOT || "/mnt/user");
@@ -417,6 +418,9 @@ async function makeEntry(logicalPath, dirent, dockerMounts) {
     type: st ? statType(st) : locations[0]?.type || "missing",
     size: st ? st.size : locations.reduce((sum, item) => sum + item.size, 0),
     mtime: st ? st.mtimeMs : Math.max(0, ...locations.map((item) => item.mtime)),
+    mode: st ? st.mode & 0o7777 : null,
+    uid: st ? st.uid : null,
+    gid: st ? st.gid : null,
     extension: path.extname(name).slice(1).toLowerCase(),
     disk: locations.length === 1 ? locations[0].disk : locations.length > 1 ? "split" : "",
     locations,
@@ -675,6 +679,103 @@ async function handleMkdir(req, res) {
   const actual = await chooseMkdirPath(parent, name);
   await fsp.mkdir(actual, { recursive: false });
   json(res, 201, { path: path.join(parent, name), actual });
+}
+
+function attachmentHeader(filename) {
+  const fallback = String(filename || "download").replace(/[^\x20-\x7e]/g, "_").replaceAll('"', "_");
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename || "download")}`;
+}
+
+async function handleUpload(req, res, query) {
+  const parent = normalizeLogical(query.parent || USER_ROOT);
+  const parentStat = await statSafe(parent);
+  if (!parentStat || !parentStat.isDirectory()) badRequest("Upload parent is not a directory");
+  const encodedName = req.headers["x-file-name"];
+  if (!encodedName) badRequest("Missing x-file-name header");
+  let decodedName;
+  try {
+    decodedName = decodeURIComponent(String(encodedName));
+  } catch {
+    badRequest("Invalid x-file-name header");
+  }
+  const name = ensureSafeName(decodedName);
+  const logicalPath = path.join(parent, name);
+  const overwrite = query.overwrite === "true";
+  const [logicalStat, locations] = await Promise.all([statSafe(logicalPath), resolveLocations(logicalPath)]);
+  const exists = Boolean(logicalStat || locations.length);
+  if (!overwrite && exists) conflict("Destination exists", { path: logicalPath });
+  if (overwrite && exists) {
+    if ((logicalStat && !logicalStat.isFile()) || locations.some((location) => location.type !== "file")) {
+      conflict("Upload cannot overwrite a non-file destination", { path: logicalPath });
+    }
+    if (locations.length > 1) {
+      conflict("Upload cannot overwrite a file stored on multiple roots", { path: logicalPath });
+    }
+  }
+  const actual = locations.length === 1 ? locations[0].path : await chooseMkdirPath(parent, name);
+
+  await fsp.mkdir(path.dirname(actual), { recursive: true });
+  const temp = path.join(path.dirname(actual), `.${path.basename(actual)}.upload-${crypto.randomBytes(6).toString("hex")}`);
+  try {
+    await new Promise((resolve, reject) => {
+      const output = fs.createWriteStream(temp, { flags: "wx" });
+      req.on("aborted", () => reject(new Error("Upload aborted")));
+      req.on("error", reject);
+      output.on("error", reject);
+      output.on("finish", resolve);
+      req.pipe(output);
+    });
+    if (overwrite) await fsp.rm(actual, { force: true });
+    await fsp.rename(temp, actual);
+    const st = await fsp.stat(actual);
+    json(res, 201, { path: logicalPath, actual, size: st.size });
+  } catch (err) {
+    await fsp.rm(temp, { force: true }).catch(() => {});
+    throw err;
+  }
+}
+
+async function handleArchiveDownload(req, res, query) {
+  const values = Array.isArray(query.path) ? query.path : query.path ? [query.path] : [];
+  if (!values.length) badRequest("No archive paths provided");
+  if (values.length > 200) badRequest("Too many archive paths");
+  const logicalPaths = values.map(normalizeLogical);
+  for (const logicalPath of logicalPaths) {
+    if (!(await statSafe(logicalPath))) throw new HttpError(404, `Path not found: ${logicalPath}`);
+  }
+  const relatives = logicalPaths.map((logicalPath) => `./${relFromUser(logicalPath) || "."}`);
+  const filename = ensureSafeName(query.name || `unraid-files-${new Date().toISOString().slice(0, 10)}.tar`);
+  res.writeHead(200, {
+    "content-type": "application/x-tar",
+    "content-disposition": attachmentHeader(filename.endsWith(".tar") ? filename : `${filename}.tar`),
+  });
+  const tar = spawn("tar", ["-cf", "-", "-C", USER_ROOT, ...relatives], { stdio: ["ignore", "pipe", "pipe"] });
+  let stderr = "";
+  tar.stderr.on("data", (chunk) => {
+    if (stderr.length < 4096) stderr += chunk.toString();
+  });
+  tar.on("error", (err) => res.destroy(err));
+  tar.on("close", (code) => {
+    if (code !== 0 && !res.destroyed) res.destroy(new Error(stderr.trim() || `tar exited with ${code}`));
+  });
+  res.on("close", () => {
+    if (!tar.killed) tar.kill();
+  });
+  tar.stdout.pipe(res);
+}
+
+async function handleChecksum(req, res, query) {
+  const logicalPath = normalizeLogical(query.path);
+  const st = await statSafe(logicalPath);
+  if (!st || !st.isFile()) return fail(res, 404, "File not found");
+  const hash = crypto.createHash("sha256");
+  await new Promise((resolve, reject) => {
+    const input = fs.createReadStream(logicalPath);
+    input.on("data", (chunk) => hash.update(chunk));
+    input.on("error", reject);
+    input.on("end", resolve);
+  });
+  json(res, 200, { path: logicalPath, algorithm: "sha256", checksum: hash.digest("hex"), size: st.size });
 }
 
 async function readJsonFile(filePath, fallback) {
@@ -1385,7 +1486,7 @@ async function handleDownload(req, res, query) {
   res.writeHead(200, {
     "content-type": "application/octet-stream",
     "content-length": st.size,
-    "content-disposition": `attachment; filename="${escapeHtml(path.basename(logicalPath))}"`,
+    "content-disposition": attachmentHeader(path.basename(logicalPath)),
   });
   const stream = fs.createReadStream(logicalPath);
   stream.on("error", (err) => {
@@ -1471,6 +1572,9 @@ async function route(req, res) {
     if (req.method === "GET" && pathname.startsWith("/api/jobs/")) return await handleJobGet(req, res, pathname);
     if (req.method === "GET" && pathname === "/api/preview") return await handlePreview(req, res, parsed.query);
     if (req.method === "GET" && pathname === "/api/download") return await handleDownload(req, res, parsed.query);
+    if (req.method === "GET" && pathname === "/api/archive") return await handleArchiveDownload(req, res, parsed.query);
+    if (req.method === "GET" && pathname === "/api/checksum") return await handleChecksum(req, res, parsed.query);
+    if (req.method === "POST" && pathname === "/api/upload") return await handleUpload(req, res, parsed.query);
     if (req.method === "POST" && pathname === "/api/move") return await handleMove(req, res);
     if (req.method === "POST" && pathname === "/api/copy") return await handleCopy(req, res);
     if (req.method === "POST" && pathname === "/api/rename") return await handleRename(req, res);

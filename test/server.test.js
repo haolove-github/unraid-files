@@ -207,6 +207,73 @@ test("html responses stay uncacheable", async () => {
   });
 });
 
+test("raw upload writes a file to the selected real root", async () => {
+  await fs.mkdir(path.join(userRoot, "share"), { recursive: true });
+  await fs.mkdir(path.join(disk1, "share"), { recursive: true });
+
+  await withServer(async (baseUrl) => {
+    const res = await fetch(`${baseUrl}/api/upload?parent=${encodeURIComponent(path.join(userRoot, "share"))}`, {
+      method: "POST",
+      headers: { "x-file-name": encodeURIComponent("uploaded file.txt") },
+      body: "uploaded content",
+    });
+    assert.equal(res.status, 201);
+    const payload = await res.json();
+    assert.equal(payload.path, path.join(userRoot, "share/uploaded file.txt"));
+  });
+
+  assert.equal(await fs.readFile(path.join(disk1, "share/uploaded file.txt"), "utf8"), "uploaded content");
+});
+
+test("upload refuses to overwrite a directory", async () => {
+  await fs.mkdir(path.join(userRoot, "share/existing"), { recursive: true });
+  await fs.mkdir(path.join(disk1, "share/existing"), { recursive: true });
+
+  await withServer(async (baseUrl) => {
+    const res = await fetch(
+      `${baseUrl}/api/upload?parent=${encodeURIComponent(path.join(userRoot, "share"))}&overwrite=true`,
+      {
+        method: "POST",
+        headers: { "x-file-name": encodeURIComponent("existing") },
+        body: "must not replace a directory",
+      }
+    );
+    assert.equal(res.status, 409);
+  });
+
+  assert.equal((await fs.stat(path.join(disk1, "share/existing"))).isDirectory(), true);
+});
+
+test("checksum endpoint returns the file SHA-256", async () => {
+  const source = await writeBoth("share/checksum.txt", "checksum content");
+
+  await withServer(async (baseUrl) => {
+    const res = await fetch(`${baseUrl}/api/checksum?path=${encodeURIComponent(source.logical)}`);
+    assert.equal(res.status, 200);
+    const payload = await res.json();
+    assert.equal(payload.algorithm, "sha256");
+    assert.equal(payload.checksum, "9efff2fbcd7ffa03ea04175167372d970629a2ea7fc00efb08819df557f92d97");
+  });
+});
+
+test("archive endpoint streams selected files as tar", async () => {
+  const first = await writeBoth("share/first.txt", "first");
+  const second = await writeBoth("share/second.txt", "second");
+
+  await withServer(async (baseUrl) => {
+    const params = new URLSearchParams();
+    params.append("path", first.logical);
+    params.append("path", second.logical);
+    params.set("name", "selected.tar");
+    const res = await fetch(`${baseUrl}/api/archive?${params.toString()}`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-disposition"), /selected\.tar/);
+    const body = Buffer.from(await res.arrayBuffer()).toString("latin1");
+    assert.match(body, /share\/first\.txt/);
+    assert.match(body, /share\/second\.txt/);
+  });
+});
+
 test("job cancel endpoint marks queued jobs as canceled", async () => {
   jobs.set("queued-job", {
     id: "queued-job",
