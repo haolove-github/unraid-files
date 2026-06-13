@@ -133,6 +133,10 @@ function formatMode(value) {
   return Number.isInteger(value) ? value.toString(8).padStart(4, "0") : "-";
 }
 
+function formatDiskLabel(value, fallback = "logical") {
+  return String(value || fallback).trim().replace(/[,\s]+$/g, "") || fallback;
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -595,7 +599,7 @@ function renderTrashRows() {
       <td>${entry.type === "directory" ? "-" : escapeHtml(formatBytes(entry.size))}</td>
       <td>${escapeHtml(formatDate(Date.parse(entry.deletedAt) || entry.mtime))}</td>
       <td><span class="owner-value">${escapeHtml(owner)}</span></td>
-      <td><span class="pill">${escapeHtml(entry.disk || "logical")}</span></td>
+      <td><span class="disk-value" title="${escapeHtml(formatDiskLabel(entry.disk))}">${escapeHtml(formatDiskLabel(entry.disk))}</span></td>
     `;
 
     els.fileRows.append(tr);
@@ -664,7 +668,7 @@ function renderRows() {
       entry.type === "directory" ? "dir" :
       entry.type === "symlink" ? "link" :
       "file";
-    const diskClass = entry.locations?.length > 1 ? "pill split" : "pill";
+    const diskLabel = formatDiskLabel(entry.disk);
     const owner = entry.uid === null || entry.uid === undefined
       ? "-"
       : `${entry.uid}:${entry.gid ?? "-"}`;
@@ -679,7 +683,7 @@ function renderRows() {
       <td>${entry.type === "directory" ? "-" : escapeHtml(formatBytes(entry.size))}</td>
       <td>${escapeHtml(formatDate(entry.mtime))}</td>
       <td><span class="owner-value">${escapeHtml(owner)}</span></td>
-      <td><span class="${diskClass}">${escapeHtml(entry.disk || "logical")}</span></td>
+      <td><span class="disk-value" title="${escapeHtml(diskLabel)}">${escapeHtml(diskLabel)}</span></td>
     `;
 
     tr.ondblclick = () => {

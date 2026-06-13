@@ -160,8 +160,9 @@ test("formatDiskLocations lists unique disks in location order", () => {
       { disk: "disk2" },
       { disk: "disk1" },
       { disk: "cache" },
+      { disk: "disk3, " },
     ]),
-    "disk1, disk2, cache"
+    "disk1, disk2, cache, disk3"
   );
   assert.equal(formatDiskLocations([]), "");
 });

@@ -310,7 +310,11 @@ function statType(st) {
 }
 
 function formatDiskLocations(locations) {
-  return [...new Set((locations || []).map((location) => location.disk).filter(Boolean))].join(", ");
+  return [...new Set(
+    (locations || [])
+      .map((location) => String(location.disk || "").trim().replace(/[,\s]+$/g, ""))
+      .filter(Boolean)
+  )].join(", ");
 }
 
 function isTextPreviewName(filePath) {

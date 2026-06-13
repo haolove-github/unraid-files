@@ -993,6 +993,15 @@ button.danger {
   white-space: nowrap;
 }
 
+.disk-value {
+  display: block;
+  max-width: 100%;
+  color: #425064;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .file-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
