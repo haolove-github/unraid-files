@@ -1,0 +1,23 @@
+{
+  "name": "unraid-files",
+  "version": "0.1.0",
+  "description": "A fast Unraid-aware file manager that scans /mnt/user and moves real files on disk roots.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/haolove-github/unraid-files.git"
+  },
+  "bugs": {
+    "url": "https://github.com/haolove-github/unraid-files/issues"
+  },
+  "homepage": "https://github.com/haolove-github/unraid-files#readme",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check public/app.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

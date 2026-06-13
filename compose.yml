@@ -1,0 +1,22 @@
+services:
+  unraid-files:
+    image: unraid-files:local
+    build: .
+    container_name: unraid-files
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      UNRAID_USER_ROOT: /mnt/user
+      UNRAID_MNT_ROOT: /mnt
+      # 强烈建议启用认证，并通过 .env 或其他安全方式传入密码。
+      # UNRAID_AUTH_USER: admin
+      # UNRAID_AUTH_PASSWORD: ${UNRAID_AUTH_PASSWORD}
+      # 可选：指定新建目录在父目录横跨多个磁盘时默认写入哪个真实根。
+      # UNRAID_DEFAULT_WRITE_ROOT: /mnt/cache
+      # 可选：手动限定真实磁盘根，逗号分隔。默认自动发现 /mnt/disk*、/mnt/cache、/mnt/pool 等。
+      # UNRAID_REAL_ROOTS: /mnt/disk1,/mnt/disk2,/mnt/cache
+    volumes:
+      - /mnt:/mnt
+      - /var/run/docker.sock:/var/run/docker.sock:ro

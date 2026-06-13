@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.*
+!.env.example
+
+SESSION_NOTES.md
+.playwright-mcp/
+.spec-workflow/
+
+.DS_Store
+npm-debug.log*
+coverage/

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Unraid Files</title>
+    <link rel="stylesheet" href="/styles.css?v=20260613-17" />
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <div class="brand-mark">UF</div>
+          <div>
+            <h1>Unraid Files</h1>
+            <p>文件管理</p>
+          </div>
+        </div>
+
+        <section class="panel locations-panel">
+          <div class="panel-head">
+            <h2>位置</h2>
+          </div>
+          <button class="source-item active" id="homeSource" type="button">
+            <span class="source-icon">U</span>
+            <span>
+              <strong>用户共享</strong>
+              <small id="rootLabel">/mnt/user</small>
+            </span>
+          </button>
+          <button class="source-item" id="trashSource" type="button">
+            <span class="source-icon trash-icon">T</span>
+            <span>
+              <strong>回收区</strong>
+              <small>恢复或清除已删除项目</small>
+            </span>
+          </button>
+          <div id="favoriteList" class="favorite-list"></div>
+        </section>
+
+        <section class="panel collapsible-panel" data-panel-key="disks">
+          <div class="panel-head">
+            <button class="panel-title" type="button" data-panel-toggle="disks" aria-expanded="true" aria-label="收起磁盘">
+              <h2>磁盘</h2>
+              <span class="panel-count" id="diskCount" aria-hidden="true"></span>
+            </button>
+            <button class="icon-button subtle panel-refresh" id="refreshDisks" title="刷新磁盘" aria-label="刷新磁盘">↻</button>
+            <button class="panel-toggle" type="button" data-panel-toggle="disks" aria-expanded="true" title="收起磁盘" aria-label="收起磁盘">
+              <span class="panel-chevron" aria-hidden="true"></span>
+            </button>
+          </div>
+          <div class="panel-body">
+            <div id="diskList" class="disk-list"></div>
+          </div>
+        </section>
+
+        <section class="panel collapsible-panel docker-panel" data-panel-key="docker">
+          <div class="panel-head">
+            <button class="panel-title" type="button" data-panel-toggle="docker" aria-expanded="true" aria-label="收起容器挂载">
+              <h2>容器挂载</h2>
+              <span class="panel-count" id="dockerCount" aria-hidden="true"></span>
+            </button>
+            <button class="icon-button subtle panel-refresh" id="refreshDocker" title="刷新 Docker" aria-label="刷新 Docker">↻</button>
+            <button class="panel-toggle" type="button" data-panel-toggle="docker" aria-expanded="true" title="收起容器挂载" aria-label="收起容器挂载">
+              <span class="panel-chevron" aria-hidden="true"></span>
+            </button>
+          </div>
+          <div class="panel-body">
+            <div id="dockerList" class="docker-list"></div>
+          </div>
+        </section>
+
+      </aside>
+
+      <section class="workspace">
+        <section class="search-summary" id="searchSummary" hidden>
+          <div class="search-summary-main">
+            <strong id="searchSummaryTitle">搜索结果</strong>
+            <span id="searchSummaryMeta" class="muted"></span>
+          </div>
+          <div class="search-summary-actions">
+            <button id="searchLoadMore" class="tool-button" type="button" hidden>加载更多</button>
+            <button id="searchClear" class="tool-button" type="button" hidden>返回目录</button>
+          </div>
+        </section>
+
+        <section class="search-panel">
+          <div class="search-panel-main">
+            <button class="icon-button mobile-only" id="sidebarToggle" title="显示侧栏" aria-label="显示侧栏" aria-expanded="false" type="button">☰</button>
+            <div class="searchbar">
+              <input id="searchInput" type="search" placeholder="搜索当前文件夹" autocomplete="off" />
+              <button id="searchButton" class="search-submit" type="button">搜索</button>
+            </div>
+          </div>
+        </section>
+
+        <nav class="directory-nav" aria-label="目录导航">
+          <button class="directory-up" id="directoryNavUp" type="button">上一级</button>
+          <div class="directory-breadcrumbs" id="directoryBreadcrumbs"></div>
+        </nav>
+
+        <section class="content">
+          <div class="table-wrap">
+            <div id="viewLoading" class="view-loading" role="status" aria-live="polite" hidden>
+              <span class="loading-spinner" aria-hidden="true"></span>
+              <strong id="viewLoadingText">正在读取...</strong>
+            </div>
+            <table class="file-table" id="fileTable">
+              <thead>
+                <tr>
+                  <th class="check-cell"><input id="selectAll" type="checkbox" /></th>
+                  <th><button class="sort-button active asc" data-sort="name" type="button">名称</button></th>
+                  <th><button class="sort-button" data-sort="size" type="button">大小</button></th>
+                  <th><button class="sort-button" data-sort="mtime" type="button">修改时间</button></th>
+                  <th><button class="sort-button" data-sort="disk" type="button">位置</button></th>
+                  <th><button class="sort-button" data-sort="docker" type="button">挂载</button></th>
+                </tr>
+              </thead>
+              <tbody id="fileRows"></tbody>
+            </table>
+            <div id="fileGrid" class="file-grid" hidden></div>
+            <div id="emptyState" class="empty" hidden></div>
+          </div>
+
+          <div class="details-head">
+            <h2>检查器</h2>
+          </div>
+          <aside class="details" id="details">
+            <div id="detailBody" class="detail-body"></div>
+          </aside>
+        </section>
+      </section>
+    </main>
+    <div id="sidebarBackdrop" class="sidebar-backdrop" hidden></div>
+
+    <dialog id="promptDialog">
+      <form method="dialog" class="dialog-form">
+        <h2 id="promptTitle">输入</h2>
+        <label>
+          <span id="promptLabel">值</span>
+          <input id="promptInput" autocomplete="off" />
+        </label>
+        <div class="dialog-actions">
+          <button value="cancel">取消</button>
+          <button value="ok" class="primary">确定</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="directoryDialog" class="directory-dialog">
+      <form method="dialog" class="dialog-form directory-form">
+        <h2 id="directoryTitle">选择目标目录</h2>
+        <div class="directory-picker">
+          <div class="directory-pathbar">
+            <button class="icon-button nav-button" id="directoryUp" type="button" title="上一级" aria-label="上一级">‹</button>
+            <div id="directoryPath" class="directory-path"></div>
+          </div>
+          <div id="directoryList" class="directory-list"></div>
+          <div id="directoryEmpty" class="directory-empty" hidden>没有子目录</div>
+        </div>
+        <div class="dialog-actions">
+          <button value="cancel">取消</button>
+          <button id="directoryChoose" value="ok" class="primary">选择此目录</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="contextMenu" class="context-menu" hidden></div>
+    <div id="toastStack" class="toast-stack" aria-live="polite"></div>
+
+    <script src="/app.js?v=20260613-12"></script>
+  </body>
+</html>
