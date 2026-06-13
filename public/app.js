@@ -349,10 +349,18 @@ function activeEntries() {
   return selected.length ? selected : state.focused && state.focused.path !== state.path ? [state.focused] : [];
 }
 
+function formatOwner(entry) {
+  if (!entry) return "-";
+  const owner = entry.owner || entry.uid;
+  const group = entry.group || entry.gid;
+  if (owner === null || owner === undefined || owner === "") return "-";
+  return `${owner}:${group === null || group === undefined || group === "" ? "-" : group}`;
+}
+
 function sortValue(entry, key) {
   if (key === "size") return entry.type === "directory" ? -1 : Number(entry.size || 0);
   if (key === "mtime") return Number(entry.mtime || 0);
-  if (key === "owner") return `${entry.uid ?? ""}:${entry.gid ?? ""}`;
+  if (key === "owner") return formatOwner(entry);
   if (key === "disk") return entry.disk || "logical";
   return entry.name || "";
 }
@@ -587,9 +595,7 @@ function renderTrashRows() {
       entry.type === "symlink" ? "link" :
       "file";
     const name = entry.name || entry.originalLogical.split("/").pop() || entry.originalLogical;
-    const owner = entry.uid === null || entry.uid === undefined
-      ? "-"
-      : `${entry.uid}:${entry.gid ?? "-"}`;
+    const owner = formatOwner(entry);
     tr.innerHTML = `
       <td>
         <div class="name-cell">
@@ -673,9 +679,7 @@ function renderRows() {
       entry.type === "symlink" ? "link" :
       "file";
     const diskLabel = formatDiskLabel(entry.disk);
-    const owner = entry.uid === null || entry.uid === undefined
-      ? "-"
-      : `${entry.uid}:${entry.gid ?? "-"}`;
+    const owner = formatOwner(entry);
 
     tr.innerHTML = `
       <td>
@@ -813,8 +817,8 @@ function renderDetails() {
         ["类型", escapeHtml(entry.type)],
         ["所在磁盘", escapeHtml(entry.disk || "-")],
         ["权限", escapeHtml(formatMode(entry.mode))],
-        ["所有者 UID", escapeHtml(entry.uid ?? "-")],
-        ["所有者 GID", escapeHtml(entry.gid ?? "-")],
+        ["所有者", escapeHtml(formatOwner(entry))],
+        ["UID:GID", escapeHtml(entry.uid === null || entry.uid === undefined ? "-" : `${entry.uid}:${entry.gid ?? "-"}`)],
         ["修改时间", escapeHtml(formatDate(entry.mtime))],
       ])
     ) + actionBlock + preview + locations + mounts;
@@ -924,6 +928,9 @@ function showContextMenu(x, y, mode) {
         menuButton("移动", "move", !selected.length),
         menuButton("复制", "copy", !selected.length),
         menuButton(selected.length === 1 && single?.type === "file" ? "下载" : "打包下载", "download", !canDownload),
+        `<hr />`,
+        menuButton("新建文件夹", "mkdir"),
+        menuButton("上传文件", "upload"),
         `<hr />`,
         menuButton("移入回收区", "trash", !selected.length),
         menuButton("永久删除", "delete", !selected.length),
@@ -1665,7 +1672,7 @@ function openAction() {
 
 els.tableWrap.oncontextmenu = (event) => {
   if (state.view === "trash") return;
-  if (event.target.closest(".file-row") || event.target.closest(".file-card") || event.target.closest("thead")) return;
+  if (event.target.closest(".file-row") || event.target.closest(".file-card")) return;
   event.preventDefault();
   state.selected.clear();
   state.focused = null;

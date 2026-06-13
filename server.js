@@ -34,6 +34,27 @@ const LIST_ENTRY_CONCURRENCY = 16;
 const SEARCH_DIRECTORY_CONCURRENCY = 8;
 const SEARCH_MATCH_CONCURRENCY = 16;
 
+function readIdentityMap(filePath, idIndex) {
+  try {
+    return new Map(
+      fs.readFileSync(filePath, "utf8")
+        .split("\n")
+        .map((line) => line.split(":"))
+        .filter((parts) => parts.length > idIndex && /^\d+$/.test(parts[idIndex]))
+        .map((parts) => [Number(parts[idIndex]), parts[0]])
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+const USER_NAMES = readIdentityMap("/etc/passwd", 2);
+const GROUP_NAMES = readIdentityMap("/etc/group", 2);
+USER_NAMES.set(0, "root");
+USER_NAMES.set(99, "nobody");
+GROUP_NAMES.set(0, "root");
+GROUP_NAMES.set(100, "users");
+
 const TEXT_PREVIEW_EXTENSIONS = new Set([
   "bash", "c", "cfg", "conf", "cpp", "cs", "css", "csv", "dart", "env", "fish",
   "go", "h", "hpp", "htm", "html", "ini", "java", "js", "json", "jsx", "kt",
@@ -317,6 +338,13 @@ function formatDiskLocations(locations) {
   )].join(", ");
 }
 
+function resolveOwnerNames(uid, gid) {
+  return {
+    owner: Number.isInteger(uid) ? USER_NAMES.get(uid) || String(uid) : "",
+    group: Number.isInteger(gid) ? GROUP_NAMES.get(gid) || String(gid) : "",
+  };
+}
+
 function isTextPreviewName(filePath) {
   const base = path.basename(filePath).toLowerCase();
   const ext = path.extname(base).slice(1);
@@ -418,6 +446,7 @@ async function makeEntry(logicalPath, dirent, dockerMounts) {
     resolveLocations(logicalPath),
   ]);
   const mounts = matchDockerMounts(logicalPath, locations, dockerMounts);
+  const identity = resolveOwnerNames(st?.uid, st?.gid);
 
   return {
     name,
@@ -429,6 +458,8 @@ async function makeEntry(logicalPath, dirent, dockerMounts) {
     mode: st ? st.mode & 0o7777 : null,
     uid: st ? st.uid : null,
     gid: st ? st.gid : null,
+    owner: identity.owner,
+    group: identity.group,
     extension: path.extname(name).slice(1).toLowerCase(),
     disk: formatDiskLocations(locations),
     locations,
@@ -1038,6 +1069,7 @@ async function fallbackTrashEntries(root, stamp, stampPath) {
     const trashPath = path.join(stampPath, dirent.name);
     const st = await statSafe(trashPath);
     if (!st) continue;
+    const identity = resolveOwnerNames(st.uid, st.gid);
     const originalLogical = path.join(USER_ROOT, dirent.name);
     const ref = {
       root,
@@ -1056,6 +1088,8 @@ async function fallbackTrashEntries(root, stamp, stampPath) {
       mtime: st.mtimeMs,
       uid: st.uid,
       gid: st.gid,
+      owner: identity.owner,
+      group: identity.group,
       deletedAt: stamp,
       manifest: false,
     });
@@ -1089,6 +1123,7 @@ async function handleTrashList(req, res) {
         if (!isSameOrChild(trashPath, trashRoot)) continue;
         const st = await statSafe(trashPath);
         if (!st) continue;
+        const identity = resolveOwnerNames(st.uid, st.gid);
         const originalLogical = normalizeLogical(item.originalLogical || USER_ROOT);
         const originalActual = path.resolve(item.originalActual || path.join(root, relFromUser(originalLogical)));
         const ref = {
@@ -1108,6 +1143,8 @@ async function handleTrashList(req, res) {
           mtime: item.mtime ?? st.mtimeMs,
           uid: st.uid,
           gid: st.gid,
+          owner: identity.owner,
+          group: identity.group,
           deletedAt: item.deletedAt || stamp,
           manifest: true,
         });
@@ -1622,6 +1659,7 @@ module.exports = {
   jobs,
   parseBoundedInt,
   formatDiskLocations,
+  resolveOwnerNames,
   searchEntries,
   runJob,
 };

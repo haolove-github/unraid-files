@@ -24,6 +24,7 @@ const {
   formatDiskLocations,
   jobs,
   parseBoundedInt,
+  resolveOwnerNames,
   searchEntries,
   runJob,
   server,
@@ -165,6 +166,12 @@ test("formatDiskLocations lists unique disks in location order", () => {
     "disk1, disk2, cache, disk3"
   );
   assert.equal(formatDiskLocations([]), "");
+});
+
+test("resolveOwnerNames maps standard Unraid ownership", () => {
+  assert.deepEqual(resolveOwnerNames(0, 0), { owner: "root", group: "root" });
+  assert.deepEqual(resolveOwnerNames(99, 100), { owner: "nobody", group: "users" });
+  assert.deepEqual(resolveOwnerNames(123456, 123456), { owner: "123456", group: "123456" });
 });
 
 test("searchEntries paginates in stable breadth-first natural order", async () => {

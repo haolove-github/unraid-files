@@ -984,7 +984,6 @@ button.danger {
 
 .file-row.active {
   background: var(--accent-soft);
-  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .owner-value {
