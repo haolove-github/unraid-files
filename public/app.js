@@ -459,6 +459,10 @@ function clearDisplayContainers() {
   els.fileGrid.innerHTML = "";
 }
 
+function resetContentScroll() {
+  els.content.scrollTop = 0;
+}
+
 function entryKey(entry) {
   return state.view === "trash" ? entry.id : entry.path;
 }
@@ -1094,6 +1098,7 @@ async function loadPath(path) {
     renderRows();
     renderDetails();
     updateSelection();
+    resetContentScroll();
     closeSidebarIfCompact();
   } finally {
     setViewLoading(false);
@@ -1119,6 +1124,7 @@ async function loadTrash() {
     renderRows();
     renderDetails();
     updateSelection();
+    resetContentScroll();
     closeSidebarIfCompact();
   } finally {
     setViewLoading(false);
@@ -1168,6 +1174,7 @@ async function loadSearch(loadMore = false) {
     renderRows();
     renderDetails();
     updateSelection();
+    if (!loadMore) resetContentScroll();
     return true;
   } catch (err) {
     if (isAbortError(err)) return false;

@@ -236,6 +236,16 @@ test("frontend exposes list and icon views without selection checkboxes", async 
   });
 });
 
+test("frontend resets the main content scroll after navigation", async () => {
+  await withServer(async (baseUrl) => {
+    const res = await fetch(`${baseUrl}/app.js?v=scroll-reset`);
+    assert.equal(res.status, 200);
+    const script = await res.text();
+    assert.match(script, /function resetContentScroll\(\)/);
+    assert.match(script, /els\.content\.scrollTop = 0/);
+  });
+});
+
 test("raw upload writes a file to the selected real root", async () => {
   await fs.mkdir(path.join(userRoot, "share"), { recursive: true });
   await fs.mkdir(path.join(disk1, "share"), { recursive: true });
