@@ -109,6 +109,10 @@ npm test
 npm start
 ```
 
+## 社区
+
+感谢 [LINUX DO](https://linux.do/) 社区提供交流与分享平台。
+
 ## 许可证
 
 [MIT License](LICENSE)
