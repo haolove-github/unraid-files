@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Unraid Files</title>
-    <link rel="stylesheet" href="/styles.css?v=20260613-20" />
+    <link rel="stylesheet" href="/styles.css?v=20260613-21" />
   </head>
   <body>
     <main class="shell">
@@ -115,8 +115,8 @@
                   <th><button class="sort-button active asc" data-sort="name" type="button">名称</button></th>
                   <th><button class="sort-button" data-sort="size" type="button">大小</button></th>
                   <th><button class="sort-button" data-sort="mtime" type="button">修改时间</button></th>
+                  <th><button class="sort-button" data-sort="owner" type="button">所有者</button></th>
                   <th><button class="sort-button" data-sort="disk" type="button">位置</button></th>
-                  <th><button class="sort-button" data-sort="docker" type="button">挂载</button></th>
                 </tr>
               </thead>
               <tbody id="fileRows"></tbody>
@@ -172,6 +172,6 @@
     <div id="toastStack" class="toast-stack" aria-live="polite"></div>
     <input id="uploadInput" type="file" multiple hidden />
 
-    <script src="/app.js?v=20260613-16"></script>
+    <script src="/app.js?v=20260613-17"></script>
   </body>
 </html>

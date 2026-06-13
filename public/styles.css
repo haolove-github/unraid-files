@@ -966,11 +966,11 @@ button.danger {
 }
 
 .file-table th:nth-child(4) {
-  width: 150px;
+  width: 104px;
 }
 
 .file-table th:nth-child(5) {
-  width: 138px;
+  width: 180px;
 }
 
 .file-row {
@@ -985,6 +985,12 @@ button.danger {
 .file-row.active {
   background: var(--accent-soft);
   box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.owner-value {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .file-grid {

@@ -1050,6 +1050,8 @@ async function fallbackTrashEntries(root, stamp, stampPath) {
       type: statType(st),
       size: st.size,
       mtime: st.mtimeMs,
+      uid: st.uid,
+      gid: st.gid,
       deletedAt: stamp,
       manifest: false,
     });
@@ -1100,6 +1102,8 @@ async function handleTrashList(req, res) {
           type: item.type || statType(st),
           size: item.size ?? st.size,
           mtime: item.mtime ?? st.mtimeMs,
+          uid: st.uid,
+          gid: st.gid,
           deletedAt: item.deletedAt || stamp,
           manifest: true,
         });

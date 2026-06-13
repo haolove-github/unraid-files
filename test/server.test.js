@@ -228,6 +228,8 @@ test("frontend exposes list and icon views without selection checkboxes", async 
     const html = await res.text();
     assert.match(html, /id="listViewButton"/);
     assert.match(html, /id="iconViewButton"/);
+    assert.match(html, /data-sort="owner"[^>]*>所有者/);
+    assert.doesNotMatch(html, /data-sort="docker"/);
     assert.doesNotMatch(html, /id="selectAll"/);
     assert.doesNotMatch(html, /type="checkbox"/);
   });

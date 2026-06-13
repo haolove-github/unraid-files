@@ -348,8 +348,8 @@ function activeEntries() {
 function sortValue(entry, key) {
   if (key === "size") return entry.type === "directory" ? -1 : Number(entry.size || 0);
   if (key === "mtime") return Number(entry.mtime || 0);
+  if (key === "owner") return `${entry.uid ?? ""}:${entry.gid ?? ""}`;
   if (key === "disk") return entry.disk || "logical";
-  if (key === "docker") return entry.dockerMounts?.map((mount) => mount.container).join(", ") || "";
   return entry.name || "";
 }
 
@@ -579,6 +579,9 @@ function renderTrashRows() {
       entry.type === "symlink" ? "link" :
       "file";
     const name = entry.name || entry.originalLogical.split("/").pop() || entry.originalLogical;
+    const owner = entry.uid === null || entry.uid === undefined
+      ? "-"
+      : `${entry.uid}:${entry.gid ?? "-"}`;
     tr.innerHTML = `
       <td>
         <div class="name-cell">
@@ -591,8 +594,8 @@ function renderTrashRows() {
       </td>
       <td>${entry.type === "directory" ? "-" : escapeHtml(formatBytes(entry.size))}</td>
       <td>${escapeHtml(formatDate(Date.parse(entry.deletedAt) || entry.mtime))}</td>
+      <td><span class="owner-value">${escapeHtml(owner)}</span></td>
       <td><span class="pill">${escapeHtml(entry.disk || "logical")}</span></td>
-      <td><span class="muted" title="${escapeHtml(entry.trashPath)}">${escapeHtml(entry.manifest ? "可恢复" : "旧项目")}</span></td>
     `;
 
     els.fileRows.append(tr);
@@ -662,9 +665,9 @@ function renderRows() {
       entry.type === "symlink" ? "link" :
       "file";
     const diskClass = entry.locations?.length > 1 ? "pill split" : "pill";
-    const docker = entry.dockerMounts?.length
-      ? `<span class="pill docker">${escapeHtml(entry.dockerMounts.map((m) => m.container).join(", "))}</span>`
-      : `<span class="muted">-</span>`;
+    const owner = entry.uid === null || entry.uid === undefined
+      ? "-"
+      : `${entry.uid}:${entry.gid ?? "-"}`;
 
     tr.innerHTML = `
       <td>
@@ -675,8 +678,8 @@ function renderRows() {
       </td>
       <td>${entry.type === "directory" ? "-" : escapeHtml(formatBytes(entry.size))}</td>
       <td>${escapeHtml(formatDate(entry.mtime))}</td>
+      <td><span class="owner-value">${escapeHtml(owner)}</span></td>
       <td><span class="${diskClass}">${escapeHtml(entry.disk || "logical")}</span></td>
-      <td>${docker}</td>
     `;
 
     tr.ondblclick = () => {
