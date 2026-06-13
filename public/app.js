@@ -611,12 +611,9 @@ function renderFileCards() {
       entry.type === "directory" ? "dir" :
       entry.type === "symlink" ? "link" :
       "file";
-    const diskClass = entry.locations?.length > 1 ? "pill split" : "pill";
-
     card.innerHTML = `
       <span class="file-icon ${iconClass}">${escapeHtml(iconFor(entry))}</span>
       <strong class="card-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</strong>
-      <span class="${diskClass}">${escapeHtml(entry.disk || "logical")}</span>
     `;
 
     card.onclick = (event) => selectEntry(event, entry);

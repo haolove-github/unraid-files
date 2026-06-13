@@ -691,12 +691,18 @@ button.danger {
 }
 
 .directory-up {
-  min-height: 28px;
-  padding: 0 9px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
   flex: 0 0 auto;
+  border: 0;
+  border-radius: 0;
   color: var(--muted);
-  background: #fff;
-  font-size: 12px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 18px;
+  line-height: 1;
 }
 
 .directory-breadcrumbs {
@@ -761,11 +767,18 @@ button.danger {
 }
 
 .directory-up:hover:not(:disabled) {
-  border-color: var(--line);
-  color: var(--muted);
-  background: #fff;
+  border-color: transparent;
+  color: var(--text);
+  background: transparent;
   box-shadow: none;
   transform: none;
+}
+
+.directory-up:disabled {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0.3;
 }
 
 .directory-crumb.current,
@@ -1031,14 +1044,6 @@ button.danger {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.file-card > .pill {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 9px;
 }
 
 .name-cell {

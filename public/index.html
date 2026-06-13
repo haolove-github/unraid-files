@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Unraid Files</title>
-    <link rel="stylesheet" href="/styles.css?v=20260613-19" />
+    <link rel="stylesheet" href="/styles.css?v=20260613-20" />
   </head>
   <body>
     <main class="shell">
@@ -95,7 +95,7 @@
         </section>
 
         <nav class="directory-nav" aria-label="目录导航">
-          <button class="directory-up" id="directoryNavUp" type="button">上一级</button>
+          <button class="directory-up" id="directoryNavUp" type="button" title="上一级" aria-label="上一级">←</button>
           <div class="directory-breadcrumbs" id="directoryBreadcrumbs"></div>
           <div class="view-switch" aria-label="视图方式">
             <button id="listViewButton" type="button" data-view-mode="list" title="列表视图">列表</button>
@@ -172,6 +172,6 @@
     <div id="toastStack" class="toast-stack" aria-live="polite"></div>
     <input id="uploadInput" type="file" multiple hidden />
 
-    <script src="/app.js?v=20260613-15"></script>
+    <script src="/app.js?v=20260613-16"></script>
   </body>
 </html>
